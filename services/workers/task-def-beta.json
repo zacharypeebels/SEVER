@@ -1,0 +1,28 @@
+{
+  "family": "sever-workers-beta",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::123456789012:role/sever-beta-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::123456789012:role/sever-beta-ecs-task-role",
+  "containerDefinitions": [
+    {
+      "name": "sever-workers",
+      "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/sever-workers:beta-latest",
+      "essential": true,
+      "environment": [
+        { "name": "SEVER_ENV", "value": "beta" }
+      ],
+      "secrets": [],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/sever-beta/workers",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "beta"
+        }
+      }
+    }
+  ]
+}

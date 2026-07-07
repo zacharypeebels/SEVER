@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [ingestion, workers, ner_parser]
+        service: [api, ingestion, workers, ner_parser]
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -39,6 +39,7 @@ jobs:
         run: |
           pip install flake8 pytest pip-audit
           pip install -r services/${{ matrix.service }}/requirements.txt
+          if [ -f services/${{ matrix.service }}/requirements-dev.txt ]; then pip install -r services/${{ matrix.service }}/requirements-dev.txt; fi
 
       - name: Code Quality Lint (Flake8)
         run: flake8 services/${{ matrix.service }} --count --select=E9,F63,F7,F82 --show-source --statistics
@@ -47,14 +48,14 @@ jobs:
         run: pip-audit -r services/${{ matrix.service }}/requirements.txt
 
       - name: Execute Test Suite
-        run: pytest services/${{ matrix.service }}/tests/
+        run: cd services/${{ matrix.service }} && pytest tests/
 
   build-and-ship:
     needs: test-and-audit
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [ingestion, workers, ner_parser]
+        service: [api, ingestion, workers, ner_parser]
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4

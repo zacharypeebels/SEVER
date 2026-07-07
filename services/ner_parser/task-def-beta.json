@@ -1,0 +1,28 @@
+{
+  "family": "sever-ner_parser-beta",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::123456789012:role/sever-beta-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::123456789012:role/sever-beta-ecs-task-role",
+  "containerDefinitions": [
+    {
+      "name": "sever-ner_parser",
+      "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/sever-ner_parser:beta-latest",
+      "essential": true,
+      "environment": [
+        { "name": "SEVER_ENV", "value": "beta" }
+      ],
+      "secrets": [],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/sever-beta/ner_parser",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "beta"
+        }
+      }
+    }
+  ]
+}
