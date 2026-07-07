@@ -1,8 +1,11 @@
 name: SEVER Fleet Deployment
 
+# Backend deployment is ON HOLD (AWS account pending verification).
+# Re-enable the push trigger below when backend services and AWS are ready.
 on:
-  push:
-    branches: [ main ]
+  workflow_dispatch:
+  # push:
+  #   branches: [ main ]
 
 permissions:
   id-token: write
