@@ -5,6 +5,7 @@ deterministic outcomes. In production this consumes from SQS, drives
 virtual-card freezes, and files merchant cancellations.
 """
 
+import os
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
@@ -92,6 +93,13 @@ def main() -> None:
     print(f"Processed {done} jobs; ${reclaimed:.2f}/mo reclaimed.")
     for job in queue.jobs:
         print(f"  [{job.status.value}] {job.result_message}")
+
+    # Service mode: stay alive as an ECS task until the SQS queue is wired in.
+    if os.environ.get("SEVER_WORKER_MODE") == "loop":
+        import time
+
+        while True:
+            time.sleep(60)
 
 
 if __name__ == "__main__":

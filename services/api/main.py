@@ -4,10 +4,11 @@ Beta implementation: in-memory store seeded with sandbox data.
 Swap the store for RDS/DynamoDB when infrastructure is provisioned.
 """
 
+import os
 import time
 from typing import Literal, Optional
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -112,3 +113,42 @@ def reset(user: dict = Depends(get_current_user)) -> dict:
     _store.clear()
     _store.update({s.id: s.model_copy() for s in SEED})
     return {"status": "reset"}
+
+
+class IngestItem(BaseModel):
+    merchant: str
+    category: str = "Uncategorized"
+    price: float
+    cadence: Literal["mo", "yr"]
+    lastUsed: int = 0
+
+
+@app.post("/internal/ingest")
+def ingest(items: list[IngestItem], request: Request) -> dict:
+    """Pipeline endpoint: upsert recurring charges detected by ingestion.
+    Guarded by a shared token; on ECS this arrives via Secrets Manager."""
+    token = os.environ.get("SEVER_INTERNAL_TOKEN")
+    if token and request.headers.get("X-Internal-Token") != token:
+        raise HTTPException(status_code=403, detail="invalid internal token")
+
+    by_name = {s.name: s for s in _store.values()}
+    created = updated = 0
+    for item in items:
+        existing = by_name.get(item.merchant)
+        if existing:
+            existing.price = item.price
+            existing.cadence = item.cadence
+            existing.lastUsed = item.lastUsed
+            updated += 1
+        else:
+            new_id = max(_store, default=0) + 1
+            _store[new_id] = Subscription(
+                id=new_id,
+                name=item.merchant,
+                category=item.category,
+                price=item.price,
+                cadence=item.cadence,
+                lastUsed=item.lastUsed,
+            )
+            created += 1
+    return {"created": created, "updated": updated}

@@ -13,7 +13,8 @@
       "essential": true,
       "environment": [
         { "name": "SEVER_ENV", "value": "beta" },
-        { "name": "SEVER_INGEST_MODE", "value": "sandbox" }
+        { "name": "SEVER_INGEST_MODE", "value": "sandbox" },
+        { "name": "SEVER_SYNC_INTERVAL", "value": "3600" }
       ],
       "secrets": [],
       "logConfiguration": {

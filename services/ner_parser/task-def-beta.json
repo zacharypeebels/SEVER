@@ -11,6 +11,12 @@
       "name": "sever-ner_parser",
       "image": "778477254868.dkr.ecr.us-east-1.amazonaws.com/sever-ner_parser:beta-latest",
       "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
       "environment": [
         { "name": "SEVER_ENV", "value": "beta" }
       ],

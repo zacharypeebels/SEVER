@@ -8,6 +8,7 @@ Runs in one of two modes controlled by SEVER_INGEST_MODE:
 """
 
 import os
+import time
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -117,11 +118,71 @@ def _fetch_from_plaid() -> list[Transaction]:
 
 
 def main() -> None:
+    interval = int(os.environ.get("SEVER_SYNC_INTERVAL", "0"))
+    while True:
+        run_pipeline()
+        if interval <= 0:
+            break
+        time.sleep(interval)
+
+
+def charges_to_items(charges: list[RecurringCharge], ner_results: list[dict] | None = None) -> list[dict]:
+    """Convert detected charges to API ingest items, using NER matches
+    (keyed by raw descriptor) to canonicalize merchant names/categories."""
+    ner_map = {r["raw"]: r for r in (ner_results or []) if r.get("merchant")}
+    items = []
+    for c in charges:
+        match = ner_map.get(c.merchant)
+        items.append(
+            {
+                "merchant": match["merchant"] if match else c.merchant,
+                "category": match["category"] if match else "Uncategorized",
+                "price": c.amount,
+                "cadence": c.cadence,
+                "lastUsed": max(0, (date.today() - c.last_seen).days),
+            }
+        )
+    return items
+
+
+def run_pipeline() -> int:
+    """One sync: fetch -> detect -> enrich via NER service -> push to API.
+    NER_PARSER_URL and SEVER_API_URL are optional; missing pieces degrade
+    to local printing so the service works standalone."""
     txns = fetch_transactions()
     charges = detect_recurring(txns)
-    print(f"Ingested {len(txns)} transactions; {len(charges)} recurring charges detected:")
-    for c in charges:
-        print(f"  {c.merchant}: ${c.amount:.2f}/{c.cadence} (seen {c.occurrences}x, last {c.last_seen})")
+
+    ner_results = None
+    ner_url = os.environ.get("NER_PARSER_URL")
+    if ner_url and charges:
+        import httpx
+
+        resp = httpx.post(
+            f"{ner_url.rstrip('/')}/parse",
+            json={"descriptors": [c.merchant for c in charges]},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        ner_results = resp.json()["results"]
+
+    items = charges_to_items(charges, ner_results)
+
+    api_url = os.environ.get("SEVER_API_URL")
+    if api_url and items:
+        import httpx
+
+        headers = {}
+        token = os.environ.get("SEVER_INTERNAL_TOKEN")
+        if token:
+            headers["X-Internal-Token"] = token
+        resp = httpx.post(f"{api_url.rstrip('/')}/internal/ingest", json=items, headers=headers, timeout=10)
+        resp.raise_for_status()
+        print(f"Synced {len(items)} recurring charges to API: {resp.json()}")
+    else:
+        print(f"Ingested {len(txns)} transactions; {len(items)} recurring charges detected:")
+        for item in items:
+            print(f"  {item['merchant']}: ${item['price']:.2f}/{item['cadence']} ({item['category']})")
+    return len(items)
 
 
 if __name__ == "__main__":

@@ -12,7 +12,8 @@
       "image": "778477254868.dkr.ecr.us-east-1.amazonaws.com/sever-workers:beta-latest",
       "essential": true,
       "environment": [
-        { "name": "SEVER_ENV", "value": "beta" }
+        { "name": "SEVER_ENV", "value": "beta" },
+        { "name": "SEVER_WORKER_MODE", "value": "loop" }
       ],
       "secrets": [],
       "logConfiguration": {
