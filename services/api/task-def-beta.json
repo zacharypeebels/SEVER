@@ -18,7 +18,11 @@
         }
       ],
       "environment": [
-        { "name": "SEVER_ENV", "value": "beta" }
+        { "name": "SEVER_ENV", "value": "beta" },
+        { "name": "AUTH_MODE", "value": "cognito" },
+        { "name": "COGNITO_REGION", "value": "us-east-1" },
+        { "name": "COGNITO_USER_POOL_ID", "value": "us-east-1_Bx7hEfpPN" },
+        { "name": "COGNITO_APP_CLIENT_ID", "value": "1rgbh29kj0k9g2ob44dqj8nd7l" }
       ],
       "secrets": [],
       "logConfiguration": {
