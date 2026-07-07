@@ -189,6 +189,81 @@ def delete_account(user: dict = Depends(get_current_user)) -> dict:
     return {"status": "deleted", "rowsDeleted": rows, "identityDeleted": identity_deleted}
 
 
+# ---------------------------------------------------------------------------
+# Bank connections — users may link any number of banks/cards. Each holds its
+# own Plaid access token, KMS-encrypted at the application layer.
+# ---------------------------------------------------------------------------
+
+import uuid
+
+import crypto
+import plaid_integration
+
+
+def _require_plaid() -> None:
+    if not plaid_integration.configured():
+        raise HTTPException(status_code=503, detail="bank connectivity not configured")
+
+
+class ExchangeRequest(BaseModel):
+    publicToken: str
+    institution: str = ""
+
+
+@app.post("/banks/link-token")
+def create_bank_link_token(user: dict = Depends(get_current_user)) -> dict:
+    _require_plaid()
+    return {"linkToken": plaid_integration.create_link_token(user["sub"])}
+
+
+@app.post("/banks/exchange")
+def exchange_bank_token(req: ExchangeRequest, user: dict = Depends(get_current_user)) -> dict:
+    _require_plaid()
+    access_token, item_id = plaid_integration.exchange_public_token(req.publicToken)
+    connection = {
+        "connectionId": str(uuid.uuid4()),
+        "itemId": item_id,
+        "institution": req.institution or "Linked bank",
+        "accessTokenEnc": crypto.encrypt_token(access_token),
+        "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    store.add_bank(user["sub"], connection)
+    return {"connectionId": connection["connectionId"], "institution": connection["institution"]}
+
+
+@app.get("/banks")
+def list_banks(user: dict = Depends(get_current_user)) -> list[dict]:
+    return store.list_banks(user["sub"])
+
+
+@app.post("/banks/sync")
+def sync_banks(user: dict = Depends(get_current_user)) -> dict:
+    """Pulls recurring charges from every linked bank into the ledger."""
+    _require_plaid()
+    connections = store.bank_tokens(user["sub"])
+    synced = 0
+    for conn in connections:
+        token = crypto.decrypt_token(conn["accessTokenEnc"])
+        for item in plaid_integration.fetch_recurring(token):
+            store.upsert_by_name(user["sub"], item)
+            synced += 1
+    return {"connections": len(connections), "syncedCharges": synced}
+
+
+@app.delete("/banks/{connection_id}")
+def disconnect_bank(connection_id: str, user: dict = Depends(get_current_user)) -> dict:
+    bank = store.get_bank(user["sub"], connection_id)
+    if bank is None:
+        raise HTTPException(status_code=404, detail="bank connection not found")
+    if plaid_integration.configured():
+        try:
+            plaid_integration.remove_item(crypto.decrypt_token(bank["accessTokenEnc"]))
+        except Exception:  # noqa: BLE001 — revocation is best-effort; local deletion must proceed
+            pass
+    store.delete_bank(user["sub"], connection_id)
+    return {"status": "disconnected", "institution": bank["institution"]}
+
+
 class IngestItem(BaseModel):
     merchant: str
     category: str = "Uncategorized"

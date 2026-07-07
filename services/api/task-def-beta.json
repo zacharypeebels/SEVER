@@ -20,6 +20,8 @@
       "environment": [
         { "name": "SEVER_ENV", "value": "beta" },
         { "name": "SEVER_STORE", "value": "postgres" },
+        { "name": "SEVER_KMS_KEY_ID", "value": "alias/sever-beta-tokens" },
+        { "name": "PLAID_ENV", "value": "sandbox" },
         { "name": "AUTH_MODE", "value": "cognito" },
         { "name": "COGNITO_REGION", "value": "us-east-1" },
         { "name": "COGNITO_USER_POOL_ID", "value": "us-east-1_Bx7hEfpPN" },
@@ -33,6 +35,14 @@
         {
           "name": "DATABASE_URL",
           "valueFrom": "arn:aws:secretsmanager:us-east-1:778477254868:secret:sever/beta/database-url-H01jPJ"
+        },
+        {
+          "name": "PLAID_CLIENT_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:778477254868:secret:sever/beta/plaid-HP3cCL:client_id::"
+        },
+        {
+          "name": "PLAID_SECRET",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:778477254868:secret:sever/beta/plaid-HP3cCL:secret::"
         }
       ],
       "logConfiguration": {

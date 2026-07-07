@@ -28,6 +28,18 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 )
 """
 
+_BANKS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS bank_connections (
+    user_id          TEXT NOT NULL,
+    connection_id    TEXT NOT NULL,
+    item_id          TEXT NOT NULL DEFAULT '',
+    institution      TEXT NOT NULL DEFAULT '',
+    access_token_enc TEXT NOT NULL,
+    created_at       TEXT NOT NULL,
+    PRIMARY KEY (user_id, connection_id)
+)
+"""
+
 
 def _row_to_dict(row: sqlite3.Row) -> dict:
     return {
@@ -48,6 +60,7 @@ class SubscriptionStore:
         self.path = path or os.environ.get("SEVER_DB_PATH", default)
         with self._db() as conn:
             conn.execute(_SCHEMA)
+            conn.execute(_BANKS_SCHEMA)
 
     @contextmanager
     def _db(self):
@@ -131,8 +144,54 @@ class SubscriptionStore:
     def delete_user(self, user_id: str) -> int:
         """Permanently remove all data for a user. Returns rows deleted."""
         with self._db() as conn:
+            conn.execute("DELETE FROM bank_connections WHERE user_id = ?", (user_id,))
             cur = conn.execute("DELETE FROM subscriptions WHERE user_id = ?", (user_id,))
             return cur.rowcount
+
+    def add_bank(self, user_id: str, connection: dict) -> None:
+        with self._db() as conn:
+            conn.execute(
+                """INSERT INTO bank_connections
+                   (user_id, connection_id, item_id, institution, access_token_enc, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    user_id, connection["connectionId"], connection["itemId"],
+                    connection["institution"], connection["accessTokenEnc"], connection["createdAt"],
+                ),
+            )
+
+    def list_banks(self, user_id: str) -> list[dict]:
+        """Public listing — never includes tokens."""
+        with self._db() as conn:
+            rows = conn.execute(
+                "SELECT connection_id, institution, created_at FROM bank_connections WHERE user_id = ? ORDER BY created_at",
+                (user_id,),
+            ).fetchall()
+            return [{"connectionId": r["connection_id"], "institution": r["institution"], "createdAt": r["created_at"]} for r in rows]
+
+    def get_bank(self, user_id: str, connection_id: str) -> Optional[dict]:
+        with self._db() as conn:
+            r = conn.execute(
+                "SELECT * FROM bank_connections WHERE user_id = ? AND connection_id = ?",
+                (user_id, connection_id),
+            ).fetchone()
+            if not r:
+                return None
+            return {"connectionId": r["connection_id"], "institution": r["institution"], "accessTokenEnc": r["access_token_enc"]}
+
+    def bank_tokens(self, user_id: str) -> list[dict]:
+        with self._db() as conn:
+            rows = conn.execute(
+                "SELECT connection_id, access_token_enc FROM bank_connections WHERE user_id = ?", (user_id,)
+            ).fetchall()
+            return [{"connectionId": r["connection_id"], "accessTokenEnc": r["access_token_enc"]} for r in rows]
+
+    def delete_bank(self, user_id: str, connection_id: str) -> bool:
+        with self._db() as conn:
+            cur = conn.execute(
+                "DELETE FROM bank_connections WHERE user_id = ? AND connection_id = ?", (user_id, connection_id)
+            )
+            return cur.rowcount > 0
 
     @staticmethod
     def _insert_many(conn: sqlite3.Connection, user_id: str, subs: list[dict]) -> None:

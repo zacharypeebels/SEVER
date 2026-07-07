@@ -1,0 +1,35 @@
+SEVER — Access Control Policy
+Version 1.0 · Adopted July 7, 2026 · Owner: Zachary Peebels, Founder
+Review cadence: annually; access reviews quarterly
+1. Principles
+Access to production assets and sensitive data follows least privilege and deny-by-default.
+There are no shared accounts and no long-lived static credentials in code or configuration.
+2. Human access
+Administrative access to AWS is via a named IAM user with multi-factor authentication
+required. The account root user is reserved for break-glass account operations and is
+not used for daily work.
+Consumer access to the application requires authentication via Amazon Cognito (email
+verification enforced; TOTP MFA available to all users). Consumer data is partitioned
+per account at the database layer; the application scopes every query to the
+authenticated identity.
+3. Non-human (machine) access
+CI/CD deployments authenticate via OpenID Connect federation (GitHub Actions →
+AWS STS), scoped to a specific repository, branch, and environment. No AWS access keys
+exist in the CI system.
+Services authenticate to AWS APIs via IAM task roles with least-privilege policies
+scoped to specific resources (e.g., a single secret path, a single user pool action).
+Secrets (database credentials, API tokens) are stored in AWS Secrets Manager, encrypted
+with AWS KMS, and injected into workloads at runtime; applications fail closed when a
+required secret is absent.
+4. Network access controls
+Databases accept connections only from the application security group.
+Application containers accept traffic only from the load balancer security group.
+No production data store is internet-addressable.
+5. Access reviews and lifecycle
+The ISO performs a quarterly access review of IAM users, roles, and policies,
+removing unused permissions.
+Upon any future personnel change, access is revoked or modified within 24 hours of
+the change becoming effective.
+6. Enforcement and exceptions
+Exceptions require written ISO approval with a documented expiry. Violations result in
+access revocation and incident review.

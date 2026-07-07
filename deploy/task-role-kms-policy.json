@@ -1,0 +1,11 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "EncryptDecryptPlaidTokens",
+      "Effect": "Allow",
+      "Action": ["kms:Encrypt", "kms:Decrypt"],
+      "Resource": "arn:aws:kms:us-east-1:778477254868:key/e06a55a2-7841-416b-a0f1-2f9f4241e79f"
+    }
+  ]
+}
