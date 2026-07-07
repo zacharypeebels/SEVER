@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SEVER — Privacy Policy</title>
+  <style>
+    body { background: #EEF2EC; color: #17221C; font-family: system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 40px 24px; line-height: 1.6; }
+    h1 { letter-spacing: 0.02em; } h1 span { color: #C22F2F; }
+    h2 { margin-top: 32px; font-size: 18px; }
+    .meta { color: #6B776F; font-size: 13px; font-family: monospace; }
+    a { color: #1E7A4C; }
+    .notice { background: #fff; border: 1px solid #D8DFD6; border-left: 4px solid #A67C1B; padding: 12px 16px; border-radius: 4px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>SEVER<span>/</span> Privacy Policy</h1>
+  <p class="meta">Effective: July 7, 2026 · Applies to the SEVER beta</p>
+
+  <div class="notice">SEVER is in beta. During the beta, bank connections use Plaid's sandbox
+  environment only — no real bank credentials or live financial account data are collected.</div>
+
+  <h2>Who we are</h2>
+  <p>SEVER ("we") is an autonomous subscription guardian: it detects recurring charges and,
+  at your direction, cancels, pauses, or renegotiates them. Contact: <a href="mailto:privacy@sever.app">privacy@sever.app</a>.</p>
+
+  <h2>What we collect</h2>
+  <ul>
+    <li><strong>Account data:</strong> your email address and a hashed password, managed by Amazon Cognito. We never see or store your password.</li>
+    <li><strong>Subscription ledger:</strong> merchants, amounts, billing cadence, usage recency, and the actions you take (sever/pause/haggle).</li>
+    <li><strong>Bank data (when live):</strong> transaction metadata via Plaid. We never receive your bank username or password — Plaid tokenizes the connection. You may connect multiple banks; each connection is separately authorized and separately revocable.</li>
+  </ul>
+
+  <h2>What we do NOT do</h2>
+  <ul>
+    <li>We do not sell your data. Ever.</li>
+    <li>We do not share your data with advertisers.</li>
+    <li>We do not store card numbers or bank credentials.</li>
+  </ul>
+
+  <h2>How your data is protected</h2>
+  <ul>
+    <li>Encrypted in transit (TLS 1.2+) and at rest (AES-256 via AWS KMS).</li>
+    <li>Stored in an isolated database reachable only by our application servers — never exposed to the internet.</li>
+    <li>Your data is partitioned per account; no other user can access it.</li>
+    <li>All administrative access to our infrastructure is logged and auditable.</li>
+  </ul>
+
+  <h2>Who we share it with</h2>
+  <p>Only infrastructure processors required to run the service: Amazon Web Services (hosting,
+  identity), Plaid (bank connectivity), and GitHub (application delivery). Each processes data
+  under their own compliance programs.</p>
+
+  <h2>Your rights</h2>
+  <ul>
+    <li><strong>Export:</strong> download everything we hold about you at any time — the "Export Data" button in the app.</li>
+    <li><strong>Delete:</strong> permanently erase your account and all associated data — the "Delete Account" button in the app. Deletion is immediate and irreversible.</li>
+    <li><strong>Disconnect:</strong> any linked bank can be disconnected individually without deleting your account.</li>
+  </ul>
+
+  <h2>Retention</h2>
+  <p>We keep your data while your account is active. Deleted accounts are erased immediately from
+  the live database; encrypted backups age out within 7 days.</p>
+
+  <h2>Changes</h2>
+  <p>We will update this policy as SEVER moves from beta to general availability (including when
+  live bank connections launch) and note material changes in the app.</p>
+
+  <p class="meta">This document describes current practice for the SEVER beta and has not yet
+  been reviewed by legal counsel.</p>
+
+  <p><a href="./index.html">← Back to SEVER</a> · <a href="./terms.html">Terms of Service</a></p>
+</body>
+</html>

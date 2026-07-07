@@ -379,6 +379,11 @@ export default function SeverAlpha() {
           </div>
           <div style={{ padding: "14px 20px", borderTop: "1px solid #263229", fontSize: 11, fontFamily: "'IBM Plex Mono', monospace", color: "#8FA396" }}>
             72-hour undo on every action · re-signup guarantee · you hold the keys
+            <div style={{ marginTop: 6 }}>
+              <a href="./privacy.html" style={{ color: "#8FA396" }}>privacy</a>
+              {" · "}
+              <a href="./terms.html" style={{ color: "#8FA396" }}>terms</a>
+            </div>
           </div>
         </aside>
       </div>
