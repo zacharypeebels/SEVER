@@ -13,7 +13,10 @@
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
         },
         "StringLike": {
-          "token.actions.githubusercontent.com:sub": "repo:zacharypeebels/SEVER:ref:refs/heads/beta"
+          "token.actions.githubusercontent.com:sub": [
+            "repo:zacharypeebels/SEVER:ref:refs/heads/beta",
+            "repo:zacharypeebels/SEVER:environment:beta"
+          ]
         }
       }
     }
