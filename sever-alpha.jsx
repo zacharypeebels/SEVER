@@ -227,7 +227,7 @@ export default function SeverAlpha() {
           SEVER<span style={{ color: LEAK }}>/</span>
         </div>
         <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: MUTE, letterSpacing: "0.06em" }}>
-          AUTONOMOUS SUBSCRIPTION GUARDIAN · ALPHA · ACCOUNT LINKED VIA PLAID (SANDBOX)
+          AUTONOMOUS SUBSCRIPTION GUARDIAN · BETA · ACCOUNT LINKED VIA PLAID (SANDBOX)
         </div>
       </header>
 
