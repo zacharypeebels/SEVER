@@ -1,7 +1,8 @@
 """SEVER API — REST endpoints backing the frontend.
 
-Beta implementation: in-memory store seeded with sandbox data.
-Swap the store for RDS/DynamoDB when infrastructure is provisioned.
+Subscriptions are stored per-user in SQLite (see store.py); the user key
+is the auth 'sub' claim — the dev user in disabled mode, the Cognito
+subject once AUTH_MODE=cognito.
 """
 
 import os
@@ -13,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from auth import get_current_user
+from store import SubscriptionStore
 
 app = FastAPI(title="SEVER API", version="0.1.0")
 
@@ -61,7 +63,9 @@ SEED = [
     Subscription(id=10, name="Dropbox Plus", category="Storage", price=11.99, cadence="mo", lastUsed=55),
 ]
 
-_store: dict[int, Subscription] = {s.id: s.model_copy() for s in SEED}
+SEED_DICTS = [s.model_dump() for s in SEED]
+
+store = SubscriptionStore()
 
 
 def monthly(sub: Subscription) -> float:
@@ -76,16 +80,18 @@ def health() -> dict:
 
 @app.get("/subscriptions", response_model=list[Subscription])
 def list_subscriptions(user: dict = Depends(get_current_user)) -> list[Subscription]:
-    return list(_store.values())
+    store.seed_user(user["sub"], SEED_DICTS)
+    return [Subscription(**s) for s in store.list(user["sub"])]
 
 
 @app.post("/subscriptions/{sub_id}/action", response_model=ActionResult)
 def act_on_subscription(
     sub_id: int, req: ActionRequest, user: dict = Depends(get_current_user)
 ) -> ActionResult:
-    sub = _store.get(sub_id)
-    if sub is None:
+    raw = store.get(user["sub"], sub_id)
+    if raw is None:
         raise HTTPException(status_code=404, detail="subscription not found")
+    sub = Subscription(**raw)
     if sub.status in ("canceled",):
         raise HTTPException(status_code=409, detail="subscription already canceled")
 
@@ -104,14 +110,14 @@ def act_on_subscription(
         reclaimed = before - monthly(sub)
         message = f"{sub.name} countered with a retention deal. New rate locked in."
 
+    store.save(user["sub"], sub.model_dump())
     return ActionResult(subscription=sub, reclaimedMonthly=round(reclaimed, 2), message=message)
 
 
 @app.post("/reset")
 def reset(user: dict = Depends(get_current_user)) -> dict:
     """Sandbox helper: restore the seed data."""
-    _store.clear()
-    _store.update({s.id: s.model_copy() for s in SEED})
+    store.reset(user["sub"], SEED_DICTS)
     return {"status": "reset"}
 
 
@@ -124,31 +130,18 @@ class IngestItem(BaseModel):
 
 
 @app.post("/internal/ingest")
-def ingest(items: list[IngestItem], request: Request) -> dict:
+def ingest(items: list[IngestItem], request: Request, user_id: str = "dev-user") -> dict:
     """Pipeline endpoint: upsert recurring charges detected by ingestion.
     Guarded by a shared token; on ECS this arrives via Secrets Manager."""
     token = os.environ.get("SEVER_INTERNAL_TOKEN")
     if token and request.headers.get("X-Internal-Token") != token:
         raise HTTPException(status_code=403, detail="invalid internal token")
 
-    by_name = {s.name: s for s in _store.values()}
     created = updated = 0
     for item in items:
-        existing = by_name.get(item.merchant)
-        if existing:
-            existing.price = item.price
-            existing.cadence = item.cadence
-            existing.lastUsed = item.lastUsed
-            updated += 1
-        else:
-            new_id = max(_store, default=0) + 1
-            _store[new_id] = Subscription(
-                id=new_id,
-                name=item.merchant,
-                category=item.category,
-                price=item.price,
-                cadence=item.cadence,
-                lastUsed=item.lastUsed,
-            )
+        outcome = store.upsert_by_name(user_id, item.model_dump())
+        if outcome == "created":
             created += 1
+        else:
+            updated += 1
     return {"created": created, "updated": updated}
