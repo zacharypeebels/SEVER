@@ -1,0 +1,91 @@
+name: SEVER Fleet Deployment
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: 123456789012.dkr.ecr.us-east-1.amazonaws.com
+  ECS_CLUSTER: sever-production-cluster
+
+jobs:
+  test-and-audit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [ingestion, workers, ner_parser]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Testing Suite
+        run: |
+          pip install flake8 pytest pip-audit
+          pip install -r services/${{ matrix.service }}/requirements.txt
+
+      - name: Code Quality Lint (Flake8)
+        run: flake8 services/${{ matrix.service }} --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: Dependency Vulnerability Audit
+        run: pip-audit -r services/${{ matrix.service }}/requirements.txt
+
+      - name: Execute Test Suite
+        run: pytest services/${{ matrix.service }}/tests/
+
+  build-and-ship:
+    needs: test-and-audit
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [ingestion, workers, ner_parser]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, Tag, and Push Image to ECR
+        env:
+          ECR_REPOSITORY: sever-${{ matrix.service }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./services/${{ matrix.service }}
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Render Task Definition with New Image
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: services/${{ matrix.service }}/task-def.json
+          container-name: sever-${{ matrix.service }}
+          image: ${{ env.ECR_REGISTRY }}/sever-${{ matrix.service }}:${{ github.sha }}
+
+      - name: Deploy to Amazon ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          service: sever-${{ matrix.service }}-service
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
