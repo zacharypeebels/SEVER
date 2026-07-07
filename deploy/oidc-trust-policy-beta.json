@@ -5,7 +5,7 @@
       "Sid": "GitHubActionsOIDCBeta",
       "Effect": "Allow",
       "Principal": {
-        "Federated": "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
+        "Federated": "arn:aws:iam::778477254868:oidc-provider/token.actions.githubusercontent.com"
       },
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
@@ -13,7 +13,7 @@
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
         },
         "StringLike": {
-          "token.actions.githubusercontent.com:sub": "repo:YOUR_ORG/YOUR_REPO:ref:refs/heads/beta"
+          "token.actions.githubusercontent.com:sub": "repo:zacharypeebels/SEVER:ref:refs/heads/beta"
         }
       }
     }

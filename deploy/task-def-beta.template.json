@@ -4,12 +4,12 @@
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "256",
   "memory": "512",
-  "executionRoleArn": "arn:aws:iam::123456789012:role/sever-beta-ecs-execution-role",
-  "taskRoleArn": "arn:aws:iam::123456789012:role/sever-beta-ecs-task-role",
+  "executionRoleArn": "arn:aws:iam::778477254868:role/sever-beta-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::778477254868:role/sever-beta-ecs-task-role",
   "containerDefinitions": [
     {
       "name": "sever-SERVICE_NAME",
-      "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/sever-SERVICE_NAME:beta-latest",
+      "image": "778477254868.dkr.ecr.us-east-1.amazonaws.com/sever-SERVICE_NAME:beta-latest",
       "essential": true,
       "portMappings": [
         {
