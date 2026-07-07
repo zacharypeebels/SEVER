@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { fetchSubscriptions, isApiConfigured, postAction } from "./src/api.js";
 
 // ————————————————————————————————————————————————
 // SEVER — Autonomous Subscription Guardian (alpha)
@@ -83,6 +84,23 @@ export default function SeverAlpha() {
     if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight;
   }, [log]);
 
+  useEffect(() => {
+    if (!isApiConfigured()) return;
+    fetchSubscriptions()
+      .then((data) => {
+        setSubs(data);
+        addLog("sys", `Live API connected — ${data.length} recurring charges loaded.`);
+      })
+      .catch(() => addLog("sys", "Live API unavailable — running in preview mode."));
+  }, []);
+
+  const clearBusy = (id) =>
+    setBusy((b) => {
+      const c = { ...b };
+      delete c[id];
+      return c;
+    });
+
   const act = (id, mode) => {
     const s = subs.find((x) => x.id === id);
     if (!s || busy[id]) return;
@@ -95,6 +113,19 @@ export default function SeverAlpha() {
         ? `Pausing ${s.name} — card frozen, merchant notified…`
         : `Opening retention negotiation with ${s.name}…`
     );
+
+    if (isApiConfigured()) {
+      postAction(id, mode)
+        .then(({ subscription, reclaimedMonthly, message }) => {
+          setSubs((prev) => prev.map((x) => (x.id === id ? subscription : x)));
+          if (reclaimedMonthly > 0) setReclaimed((r) => r + reclaimedMonthly);
+          addLog("done", message);
+        })
+        .catch(() => addLog("sys", `Guardian could not reach ${s.name} — action aborted.`))
+        .finally(() => clearBusy(id));
+      return;
+    }
+
     const delay = 900 + Math.random() * 1100;
     setTimeout(() => {
       setSubs((prev) =>
@@ -117,11 +148,7 @@ export default function SeverAlpha() {
         setReclaimed((r) => r + (monthly(s) - monthly({ ...s, price: cutPrice })));
         addLog("done", `${s.name} countered with a retention deal. New rate locked in.`);
       }
-      setBusy((b) => {
-        const c = { ...b };
-        delete c[id];
-        return c;
-      });
+      clearBusy(id);
     }, delay);
   };
 

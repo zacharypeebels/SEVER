@@ -36,6 +36,11 @@ jobs:
         run: npm ci
 
       - name: Build (base path = repo name)
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN }}
+          VITE_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID }}
+          VITE_COGNITO_REDIRECT_URI: ${{ vars.VITE_COGNITO_REDIRECT_URI }}
         run: npm run build -- --base=/${{ github.event.repository.name }}/
 
       - name: Upload Pages Artifact
