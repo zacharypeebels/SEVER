@@ -16,6 +16,17 @@ from pydantic import BaseModel
 from auth import get_current_user
 from store import SubscriptionStore
 
+
+def _make_store():
+    """Postgres in deployed environments (SEVER_STORE=postgres); SQLite for
+    local dev and unit tests."""
+    if os.environ.get("SEVER_STORE") == "postgres":
+        from pg_store import PostgresSubscriptionStore
+
+        return PostgresSubscriptionStore()
+    return SubscriptionStore()
+
+
 _expose_docs = os.environ.get("SEVER_ENV", "dev") == "dev"
 app = FastAPI(
     title="SEVER API",
@@ -72,7 +83,7 @@ SEED = [
 
 SEED_DICTS = [s.model_dump() for s in SEED]
 
-store = SubscriptionStore()
+store = _make_store()
 
 
 def monthly(sub: Subscription) -> float:
