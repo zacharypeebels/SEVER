@@ -16,7 +16,14 @@ from pydantic import BaseModel
 from auth import get_current_user
 from store import SubscriptionStore
 
-app = FastAPI(title="SEVER API", version="0.1.0")
+_expose_docs = os.environ.get("SEVER_ENV", "dev") == "dev"
+app = FastAPI(
+    title="SEVER API",
+    version="0.1.0",
+    docs_url="/docs" if _expose_docs else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if _expose_docs else None,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -155,9 +162,12 @@ class IngestItem(BaseModel):
 @app.post("/internal/ingest")
 def ingest(items: list[IngestItem], request: Request, user_id: str = "dev-user") -> dict:
     """Pipeline endpoint: upsert recurring charges detected by ingestion.
-    Guarded by a shared token; on ECS this arrives via Secrets Manager."""
+    Fail-closed: refuses all requests unless the shared token is configured
+    and presented. On ECS the token arrives via Secrets Manager."""
     token = os.environ.get("SEVER_INTERNAL_TOKEN")
-    if token and request.headers.get("X-Internal-Token") != token:
+    if not token:
+        raise HTTPException(status_code=503, detail="internal ingest not configured")
+    if request.headers.get("X-Internal-Token") != token:
         raise HTTPException(status_code=403, detail="invalid internal token")
 
     created = updated = 0

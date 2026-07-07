@@ -24,7 +24,12 @@
         { "name": "COGNITO_USER_POOL_ID", "value": "us-east-1_Bx7hEfpPN" },
         { "name": "COGNITO_APP_CLIENT_ID", "value": "1rgbh29kj0k9g2ob44dqj8nd7l" }
       ],
-      "secrets": [],
+      "secrets": [
+        {
+          "name": "SEVER_INTERNAL_TOKEN",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:778477254868:secret:sever/beta/internal-token-G6J4Ls"
+        }
+      ],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
