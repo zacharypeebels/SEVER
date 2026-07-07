@@ -7,9 +7,11 @@ Swap the store for RDS/DynamoDB when infrastructure is provisioned.
 import time
 from typing import Literal, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+from auth import get_current_user
 
 app = FastAPI(title="SEVER API", version="0.1.0")
 
@@ -72,12 +74,14 @@ def health() -> dict:
 
 
 @app.get("/subscriptions", response_model=list[Subscription])
-def list_subscriptions() -> list[Subscription]:
+def list_subscriptions(user: dict = Depends(get_current_user)) -> list[Subscription]:
     return list(_store.values())
 
 
 @app.post("/subscriptions/{sub_id}/action", response_model=ActionResult)
-def act_on_subscription(sub_id: int, req: ActionRequest) -> ActionResult:
+def act_on_subscription(
+    sub_id: int, req: ActionRequest, user: dict = Depends(get_current_user)
+) -> ActionResult:
     sub = _store.get(sub_id)
     if sub is None:
         raise HTTPException(status_code=404, detail="subscription not found")
@@ -103,7 +107,7 @@ def act_on_subscription(sub_id: int, req: ActionRequest) -> ActionResult:
 
 
 @app.post("/reset")
-def reset() -> dict:
+def reset(user: dict = Depends(get_current_user)) -> dict:
     """Sandbox helper: restore the seed data."""
     _store.clear()
     _store.update({s.id: s.model_copy() for s in SEED})
