@@ -125,6 +125,12 @@ class PostgresSubscriptionStore:
             conn.execute("DELETE FROM subscriptions WHERE user_id = %s", (user_id,))
             self._insert_many(conn, user_id, seed)
 
+    def delete_user(self, user_id: str) -> int:
+        """Permanently remove all data for a user. Returns rows deleted."""
+        with self._db() as conn:
+            cur = conn.execute("DELETE FROM subscriptions WHERE user_id = %s", (user_id,))
+            return cur.rowcount
+
     @staticmethod
     def _insert_many(conn, user_id: str, subs: list[dict]) -> None:
         conn.cursor().executemany(

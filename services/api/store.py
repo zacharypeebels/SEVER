@@ -128,6 +128,12 @@ class SubscriptionStore:
             conn.execute("DELETE FROM subscriptions WHERE user_id = ?", (user_id,))
             self._insert_many(conn, user_id, seed)
 
+    def delete_user(self, user_id: str) -> int:
+        """Permanently remove all data for a user. Returns rows deleted."""
+        with self._db() as conn:
+            cur = conn.execute("DELETE FROM subscriptions WHERE user_id = ?", (user_id,))
+            return cur.rowcount
+
     @staticmethod
     def _insert_many(conn: sqlite3.Connection, user_id: str, subs: list[dict]) -> None:
         conn.executemany(

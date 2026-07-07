@@ -3,3 +3,4 @@ uvicorn[standard]==0.50.2
 pydantic==2.13.4
 PyJWT[crypto]==2.13.0
 psycopg[binary]>=3.2
+boto3>=1.34

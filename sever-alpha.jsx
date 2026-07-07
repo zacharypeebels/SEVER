@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { fetchSubscriptions, isApiConfigured, postAction, postUndo } from "./src/api.js";
+import { deleteAccount, downloadExport, fetchSubscriptions, isApiConfigured, postAction, postUndo } from "./src/api.js";
+import { logout } from "./src/auth.js";
 
 // ————————————————————————————————————————————————
 // SEVER — Autonomous Subscription Guardian (alpha)
@@ -193,6 +194,19 @@ export default function SeverAlpha() {
     addLog("sys", `${s.name} restored. Card unfrozen.`);
   };
 
+  const handleExport = () =>
+    downloadExport()
+      .then(() => addLog("sys", "Data export downloaded."))
+      .catch(() => addLog("sys", "Export failed — try again."));
+
+  const handleDeleteAccount = () => {
+    if (!window.confirm("Permanently delete your SEVER account and all data? This cannot be undone.")) return;
+    if (!window.confirm("Last check — this erases your ledger and sign-in. Proceed?")) return;
+    deleteAccount()
+      .then(() => logout())
+      .catch(() => addLog("sys", "Account deletion failed — try again or contact support."));
+  };
+
   const statusChip = (s) => {
     const map = {
       canceled: { txt: "SEVERED", bg: INK, fg: PAPER },
@@ -229,6 +243,16 @@ export default function SeverAlpha() {
         <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: MUTE, letterSpacing: "0.06em" }}>
           AUTONOMOUS SUBSCRIPTION GUARDIAN · BETA · ACCOUNT LINKED VIA PLAID (SANDBOX)
         </div>
+        {isApiConfigured() && (
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+            <button onClick={handleExport} style={{ background: "transparent", border: `1px solid ${LINE}`, color: MUTE, borderRadius: 3, padding: "5px 10px", fontSize: 10, letterSpacing: "0.08em", fontFamily: "'IBM Plex Mono', monospace" }}>
+              EXPORT DATA
+            </button>
+            <button onClick={handleDeleteAccount} style={{ background: "transparent", border: `1px solid ${LEAK}`, color: LEAK, borderRadius: 3, padding: "5px 10px", fontSize: 10, letterSpacing: "0.08em", fontFamily: "'IBM Plex Mono', monospace" }}>
+              DELETE ACCOUNT
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Bleed band — the signature */}

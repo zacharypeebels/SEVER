@@ -162,6 +162,33 @@ def reset(user: dict = Depends(get_current_user)) -> dict:
     return {"status": "reset"}
 
 
+@app.get("/account/export")
+def export_account(user: dict = Depends(get_current_user)) -> dict:
+    """Data portability: everything we hold about the authenticated user."""
+    return {
+        "exportedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "user": {"id": user["sub"], "email": user.get("email", "")},
+        "subscriptions": store.list(user["sub"]),
+    }
+
+
+@app.delete("/account")
+def delete_account(user: dict = Depends(get_current_user)) -> dict:
+    """Right to erasure: permanently deletes the user's ledger and,
+    in cognito mode, their identity. Irreversible."""
+    rows = store.delete_user(user["sub"])
+    identity_deleted = False
+    if os.environ.get("AUTH_MODE") == "cognito":
+        import boto3
+
+        boto3.client("cognito-idp", region_name=os.environ["COGNITO_REGION"]).admin_delete_user(
+            UserPoolId=os.environ["COGNITO_USER_POOL_ID"],
+            Username=user["sub"],
+        )
+        identity_deleted = True
+    return {"status": "deleted", "rowsDeleted": rows, "identityDeleted": identity_deleted}
+
+
 class IngestItem(BaseModel):
     merchant: str
     category: str = "Uncategorized"

@@ -1,0 +1,11 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DeleteOwnPoolUsers",
+      "Effect": "Allow",
+      "Action": "cognito-idp:AdminDeleteUser",
+      "Resource": "arn:aws:cognito-idp:us-east-1:778477254868:userpool/us-east-1_Bx7hEfpPN"
+    }
+  ]
+}

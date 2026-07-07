@@ -41,3 +41,17 @@ export function postAction(id, mode) {
 export function postUndo(id) {
   return request(`/subscriptions/${id}/undo`, { method: "POST" });
 }
+
+export async function downloadExport() {
+  const data = await request("/account/export");
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `sever-export-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+export function deleteAccount() {
+  return request("/account", { method: "DELETE" });
+}
