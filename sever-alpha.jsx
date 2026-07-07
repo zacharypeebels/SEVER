@@ -89,6 +89,14 @@ export default function SeverAlpha() {
     fetchSubscriptions()
       .then((data) => {
         setSubs(data);
+        // Derive reclaimed from server state so it survives refreshes:
+        // canceled/paused reclaim their full monthly; negotiated reclaims the discount.
+        const recovered = data.reduce((acc, s) => {
+          if (s.status === "canceled" || s.status === "paused") return acc + monthly(s);
+          if (s.status === "negotiated" && s.newPrice) return acc + (monthly(s) - monthly({ ...s, price: s.newPrice }));
+          return acc;
+        }, 0);
+        setReclaimed(recovered);
         addLog("sys", `Live API connected — ${data.length} recurring charges loaded.`);
       })
       .catch(() => addLog("sys", "Live API unavailable — running in preview mode."));
