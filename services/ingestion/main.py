@@ -85,12 +85,39 @@ def fetch_transactions() -> list[Transaction]:
     raise ValueError(f"unknown SEVER_INGEST_MODE: {mode}")
 
 
-def _fetch_from_plaid() -> list[Transaction]:
-    """Pull transactions from the Plaid sandbox. Imported lazily so the
-    sandbox mode has no Plaid dependency at runtime."""
+def fetch_recurring_charges() -> list[RecurringCharge]:
+    """Preferred entry point: uses Plaid's purpose-built recurring streams
+    endpoint when available, falling back to raw-transaction detection."""
+    mode = os.environ.get("SEVER_INGEST_MODE", "sandbox")
+    if mode == "sandbox":
+        return detect_recurring(sample_transactions())
+    if mode == "plaid":
+        try:
+            return _fetch_recurring_streams()
+        except Exception as exc:  # Plaid recurring can lag on fresh sandbox items
+            print(f"Recurring streams unavailable ({type(exc).__name__}); falling back to transaction scan.")
+            return detect_recurring(_fetch_from_plaid())
+    raise ValueError(f"unknown SEVER_INGEST_MODE: {mode}")
+
+
+_YEARLY_FREQUENCIES = {"ANNUALLY", "SEMI_ANNUALLY"}
+
+
+def stream_to_charge(merchant: str, amount: float, frequency: str, last_date: date, occurrences: int) -> RecurringCharge:
+    """Map one Plaid recurring stream to a RecurringCharge."""
+    cadence = "yr" if str(frequency).upper() in _YEARLY_FREQUENCIES else "mo"
+    return RecurringCharge(
+        merchant=merchant,
+        amount=round(abs(amount), 2),
+        cadence=cadence,
+        occurrences=occurrences,
+        last_seen=last_date,
+    )
+
+
+def _plaid_client():
     import plaid
     from plaid.api import plaid_api
-    from plaid.model.transactions_get_request import TransactionsGetRequest
 
     configuration = plaid.Configuration(
         host=plaid.Environment.Sandbox,
@@ -99,7 +126,39 @@ def _fetch_from_plaid() -> list[Transaction]:
             "secret": os.environ["PLAID_SECRET"],
         },
     )
-    client = plaid_api.PlaidApi(plaid.ApiClient(configuration))
+    return plaid_api.PlaidApi(plaid.ApiClient(configuration))
+
+
+def _fetch_recurring_streams() -> list[RecurringCharge]:
+    """Pull recurring outflow streams from Plaid — their ML-driven
+    subscription detection, better than our month-bucketing heuristic."""
+    from plaid.model.transactions_recurring_get_request import TransactionsRecurringGetRequest
+
+    client = _plaid_client()
+    request = TransactionsRecurringGetRequest(access_token=os.environ["PLAID_ACCESS_TOKEN"])
+    response = client.transactions_recurring_get(request)
+    charges = []
+    for stream in response.outflow_streams:
+        if not getattr(stream, "is_active", True):
+            continue
+        charges.append(
+            stream_to_charge(
+                merchant=stream.merchant_name or stream.description,
+                amount=float(stream.average_amount.amount),
+                frequency=str(stream.frequency),
+                last_date=stream.last_date,
+                occurrences=len(stream.transaction_ids),
+            )
+        )
+    return sorted(charges, key=lambda c: c.merchant)
+
+
+def _fetch_from_plaid() -> list[Transaction]:
+    """Pull raw transactions from the Plaid sandbox. Imported lazily so the
+    sandbox mode has no Plaid dependency at runtime."""
+    from plaid.model.transactions_get_request import TransactionsGetRequest
+
+    client = _plaid_client()
     request = TransactionsGetRequest(
         access_token=os.environ["PLAID_ACCESS_TOKEN"],
         start_date=date.today() - timedelta(days=90),
@@ -149,8 +208,7 @@ def run_pipeline() -> int:
     """One sync: fetch -> detect -> enrich via NER service -> push to API.
     NER_PARSER_URL and SEVER_API_URL are optional; missing pieces degrade
     to local printing so the service works standalone."""
-    txns = fetch_transactions()
-    charges = detect_recurring(txns)
+    charges = fetch_recurring_charges()
 
     ner_results = None
     ner_url = os.environ.get("NER_PARSER_URL")
@@ -179,7 +237,7 @@ def run_pipeline() -> int:
         resp.raise_for_status()
         print(f"Synced {len(items)} recurring charges to API: {resp.json()}")
     else:
-        print(f"Ingested {len(txns)} transactions; {len(items)} recurring charges detected:")
+        print(f"Detected {len(items)} recurring charges:")
         for item in items:
             print(f"  {item['merchant']}: ${item['price']:.2f}/{item['cadence']} ({item['category']})")
     return len(items)
