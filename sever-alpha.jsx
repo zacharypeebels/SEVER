@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { fetchSubscriptions, isApiConfigured, postAction } from "./src/api.js";
+import { fetchSubscriptions, isApiConfigured, postAction, postUndo } from "./src/api.js";
 
 // ————————————————————————————————————————————————
 // SEVER — Autonomous Subscription Guardian (alpha)
@@ -168,6 +168,18 @@ export default function SeverAlpha() {
   const undo = (id) => {
     const s = subs.find((x) => x.id === id);
     if (!s) return;
+
+    if (isApiConfigured()) {
+      postUndo(id)
+        .then(({ subscription, reclaimedMonthly, message }) => {
+          setSubs((prev) => prev.map((x) => (x.id === id ? subscription : x)));
+          setReclaimed((r) => Math.max(0, r + reclaimedMonthly));
+          addLog("sys", message);
+        })
+        .catch(() => addLog("sys", `Could not restore ${s.name} — try again.`));
+      return;
+    }
+
     setSubs((prev) => prev.map((x) => (x.id === id ? { ...x, status: "active", newPrice: undefined } : x)));
     setReclaimed((r) => Math.max(0, r - monthly(s)));
     addLog("sys", `${s.name} restored. Card unfrozen.`);

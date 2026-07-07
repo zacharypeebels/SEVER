@@ -114,6 +114,29 @@ def act_on_subscription(
     return ActionResult(subscription=sub, reclaimedMonthly=round(reclaimed, 2), message=message)
 
 
+@app.post("/subscriptions/{sub_id}/undo", response_model=ActionResult)
+def undo_subscription(sub_id: int, user: dict = Depends(get_current_user)) -> ActionResult:
+    """Reverse a sever/pause/haggle within the undo window."""
+    raw = store.get(user["sub"], sub_id)
+    if raw is None:
+        raise HTTPException(status_code=404, detail="subscription not found")
+    sub = Subscription(**raw)
+    if sub.status == "active":
+        raise HTTPException(status_code=409, detail="nothing to undo")
+
+    base = monthly(Subscription(**{**raw, "status": "active", "newPrice": None}))
+    returned = base - monthly(sub) if sub.status == "negotiated" else base
+
+    sub.status = "active"
+    sub.newPrice = None
+    store.save(user["sub"], sub.model_dump())
+    return ActionResult(
+        subscription=sub,
+        reclaimedMonthly=round(-returned, 2),
+        message=f"{sub.name} restored. Card unfrozen.",
+    )
+
+
 @app.post("/reset")
 def reset(user: dict = Depends(get_current_user)) -> dict:
     """Sandbox helper: restore the seed data."""

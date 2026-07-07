@@ -37,3 +37,7 @@ export function postAction(id, mode) {
     body: JSON.stringify({ mode: MODE_MAP[mode] ?? mode }),
   });
 }
+
+export function postUndo(id) {
+  return request(`/subscriptions/${id}/undo`, { method: "POST" });
+}
