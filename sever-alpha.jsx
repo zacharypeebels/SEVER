@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { deleteAccount, downloadExport, fetchSubscriptions, isApiConfigured, postAction, postUndo } from "./src/api.js";
+import {
+  createLinkToken, deleteAccount, disconnectBank, downloadExport,
+  exchangeBankToken, fetchBanks, fetchSubscriptions, isApiConfigured,
+  postAction, postUndo, syncBanks,
+} from "./src/api.js";
 import { logout } from "./src/auth.js";
+import { openPlaidLink } from "./src/plaidLink.js";
 
 // ————————————————————————————————————————————————
 // SEVER — Autonomous Subscription Guardian (alpha)
@@ -67,6 +72,8 @@ export default function SeverAlpha() {
   const [busy, setBusy] = useState({});
   const [autopilotRunning, setAutopilotRunning] = useState(false);
   const [reclaimed, setReclaimed] = useState(0);
+  const [banks, setBanks] = useState([]);
+  const [linking, setLinking] = useState(false);
   const feedRef = useRef(null);
 
   const active = subs.filter((s) => s.status === "active" || s.status === "negotiated");
@@ -101,6 +108,7 @@ export default function SeverAlpha() {
         addLog("sys", `Live API connected — ${data.length} recurring charges loaded.`);
       })
       .catch(() => addLog("sys", "Live API unavailable — running in preview mode."));
+    fetchBanks().then(setBanks).catch(() => {});
   }, []);
 
   const clearBusy = (id) =>
@@ -207,6 +215,39 @@ export default function SeverAlpha() {
       .catch(() => addLog("sys", "Account deletion failed — try again or contact support."));
   };
 
+  const connectBank = async () => {
+    if (linking) return;
+    setLinking(true);
+    try {
+      addLog("work", "Opening secure bank connection via Plaid…");
+      const { linkToken } = await createLinkToken();
+      const { publicToken, institution } = await openPlaidLink(linkToken);
+      addLog("work", `Linking ${institution}…`);
+      await exchangeBankToken(publicToken, institution);
+      setBanks(await fetchBanks());
+      addLog("done", `${institution} linked. Scanning for recurring charges…`);
+      const result = await syncBanks();
+      const data = await fetchSubscriptions();
+      setSubs(data);
+      addLog("done", `Sync complete — ${result.syncedCharges} recurring charges across ${result.connections} bank${result.connections === 1 ? "" : "s"}.`);
+    } catch (e) {
+      addLog("sys", e?.message === "link-cancelled" ? "Bank connection cancelled." : "Bank connection failed — try again.");
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  const removeBank = async (bank) => {
+    if (!window.confirm(`Disconnect ${bank.institution}? Its charges stay in your ledger until the next sync.`)) return;
+    try {
+      await disconnectBank(bank.connectionId);
+      setBanks((prev) => prev.filter((b) => b.connectionId !== bank.connectionId));
+      addLog("sys", `${bank.institution} disconnected and access revoked.`);
+    } catch {
+      addLog("sys", `Could not disconnect ${bank.institution} — try again.`);
+    }
+  };
+
   const statusChip = (s) => {
     const map = {
       canceled: { txt: "SEVERED", bg: INK, fg: PAPER },
@@ -254,6 +295,33 @@ export default function SeverAlpha() {
           </div>
         )}
       </header>
+
+      {/* Linked banks strip — live mode only */}
+      {isApiConfigured() && (
+        <section style={{ borderBottom: `1px solid ${LINE}`, background: CARD, padding: "10px 28px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 10, letterSpacing: "0.14em", color: MUTE, fontFamily: "'IBM Plex Mono', monospace" }}>LINKED BANKS</span>
+          {banks.map((b) => (
+            <span key={b.connectionId} style={{ display: "inline-flex", alignItems: "center", gap: 6, border: `1px solid ${LINE}`, borderLeft: `3px solid ${GUARD}`, borderRadius: 3, padding: "4px 8px", fontSize: 11, fontFamily: "'IBM Plex Mono', monospace" }}>
+              {b.institution}
+              <button onClick={() => removeBank(b)} aria-label={`Disconnect ${b.institution}`} style={{ background: "transparent", border: "none", color: MUTE, fontSize: 12, padding: 0, lineHeight: 1 }}>
+                ✕
+              </button>
+            </span>
+          ))}
+          {banks.length === 0 && (
+            <span style={{ fontSize: 11, color: MUTE, fontFamily: "'IBM Plex Mono', monospace" }}>
+              none — ledger shows sample data until you connect
+            </span>
+          )}
+          <button
+            onClick={connectBank}
+            disabled={linking}
+            style={{ background: linking ? "#CDD5CB" : GUARD, color: "#fff", border: "none", borderRadius: 3, padding: "6px 12px", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", fontFamily: "'IBM Plex Mono', monospace" }}
+          >
+            {linking ? "CONNECTING…" : "+ CONNECT BANK"}
+          </button>
+        </section>
+      )}
 
       {/* Bleed band — the signature */}
       <section style={{ display: "flex", flexWrap: "wrap", borderBottom: `1px solid ${LINE}`, background: CARD }}>

@@ -55,3 +55,28 @@ export async function downloadExport() {
 export function deleteAccount() {
   return request("/account", { method: "DELETE" });
 }
+
+// --- Bank connections (multi-bank) ---
+
+export function fetchBanks() {
+  return request("/banks");
+}
+
+export function createLinkToken() {
+  return request("/banks/link-token", { method: "POST" });
+}
+
+export function exchangeBankToken(publicToken, institution) {
+  return request("/banks/exchange", {
+    method: "POST",
+    body: JSON.stringify({ publicToken, institution }),
+  });
+}
+
+export function syncBanks() {
+  return request("/banks/sync", { method: "POST" });
+}
+
+export function disconnectBank(connectionId) {
+  return request(`/banks/${connectionId}`, { method: "DELETE" });
+}
