@@ -41,6 +41,29 @@ export function getAccessToken() {
   return getTokens()?.access_token ?? null;
 }
 
+// Decoded ID-token claims (email, sub) for profile display. Display only —
+// authorization always happens server-side against the signed access token.
+export function getIdClaims() {
+  const idToken = getTokens()?.id_token;
+  if (!idToken) return null;
+  try {
+    const payload = idToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(payload));
+  } catch {
+    return null;
+  }
+}
+
+export function passwordResetUrl() {
+  const params = new URLSearchParams({
+    client_id: clientId,
+    response_type: "code",
+    scope: "openid email",
+    redirect_uri: redirectUri,
+  });
+  return `https://${domain}/forgotPassword?${params}`;
+}
+
 // Handle the ?code=... redirect back from the Cognito Hosted UI.
 export async function completeLoginFromRedirect() {
   const code = new URLSearchParams(window.location.search).get("code");

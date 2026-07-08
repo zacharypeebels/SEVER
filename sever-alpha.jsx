@@ -4,7 +4,7 @@ import {
   exchangeBankToken, fetchBanks, fetchSubscriptions, isApiConfigured,
   postAction, postUndo, syncBanks,
 } from "./src/api.js";
-import { logout } from "./src/auth.js";
+import { logout, getIdClaims, passwordResetUrl } from "./src/auth.js";
 import { openPlaidLink } from "./src/plaidLink.js";
 
 // ————————————————————————————————————————————————
@@ -74,6 +74,7 @@ export default function SeverAlpha() {
   const [reclaimed, setReclaimed] = useState(0);
   const [banks, setBanks] = useState([]);
   const [linking, setLinking] = useState(false);
+  const [view, setView] = useState("ledger");
   const feedRef = useRef(null);
 
   const active = subs.filter((s) => s.status === "active" || s.status === "negotiated");
@@ -286,15 +287,18 @@ export default function SeverAlpha() {
         </div>
         {isApiConfigured() && (
           <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-            <button onClick={handleExport} style={{ background: "transparent", border: `1px solid ${LINE}`, color: MUTE, borderRadius: 3, padding: "5px 10px", fontSize: 10, letterSpacing: "0.08em", fontFamily: "'IBM Plex Mono', monospace" }}>
-              EXPORT DATA
-            </button>
-            <button onClick={handleDeleteAccount} style={{ background: "transparent", border: `1px solid ${LEAK}`, color: LEAK, borderRadius: 3, padding: "5px 10px", fontSize: 10, letterSpacing: "0.08em", fontFamily: "'IBM Plex Mono', monospace" }}>
-              DELETE ACCOUNT
+            <button
+              onClick={() => setView(view === "settings" ? "ledger" : "settings")}
+              style={{ background: "transparent", border: `1px solid ${view === "settings" ? INK : LINE}`, color: INK, borderRadius: 3, padding: "5px 12px", fontSize: 10, letterSpacing: "0.08em", fontWeight: 600, fontFamily: "'IBM Plex Mono', monospace" }}
+            >
+              {view === "settings" ? "← BACK TO LEDGER" : "SETTINGS"}
             </button>
           </div>
         )}
       </header>
+
+      {view === "ledger" ? (
+      <>
 
       {/* Linked banks strip — live mode only */}
       {isApiConfigured() && (
@@ -455,6 +459,109 @@ export default function SeverAlpha() {
           </div>
         </aside>
       </div>
+      </>
+      ) : (
+      <SettingsView
+        banks={banks}
+        linking={linking}
+        connectBank={connectBank}
+        removeBank={removeBank}
+        handleExport={handleExport}
+        handleDeleteAccount={handleDeleteAccount}
+      />
+      )}
     </div>
+  );
+}
+
+function SettingsView({ banks, linking, connectBank, removeBank, handleExport, handleDeleteAccount }) {
+  const claims = getIdClaims();
+  const label = { fontSize: 10, letterSpacing: "0.14em", color: MUTE, fontFamily: "'IBM Plex Mono', monospace", marginBottom: 10 };
+  const card = { background: CARD, border: `1px solid ${LINE}`, borderRadius: 4, padding: "18px 20px", marginBottom: 16 };
+  const btn = (color = INK, filled = false) => ({
+    background: filled ? color : "transparent", color: filled ? "#fff" : color,
+    border: `1px solid ${color}`, borderRadius: 3, padding: "7px 14px",
+    fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", fontFamily: "'IBM Plex Mono', monospace",
+  });
+  const row = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "8px 0" };
+  const mono = { fontFamily: "'IBM Plex Mono', monospace", fontSize: 13 };
+
+  return (
+    <main style={{ maxWidth: 680, margin: "0 auto", padding: "28px 24px 60px" }}>
+      <div style={card}>
+        <div style={label}>PROFILE</div>
+        <div style={row}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>{claims?.email || "Signed in"}</div>
+            <div style={{ ...mono, fontSize: 11, color: MUTE, marginTop: 2 }}>
+              member id: {claims?.sub ? claims.sub.slice(0, 8) + "…" : "—"}
+              {claims?.email_verified ? " · email verified" : ""}
+            </div>
+          </div>
+          <button onClick={() => logout()} style={btn()}>SIGN OUT</button>
+        </div>
+      </div>
+
+      <div style={card}>
+        <div style={label}>SECURITY</div>
+        <div style={row}>
+          <div style={mono}>Password</div>
+          <a href={passwordResetUrl()} style={{ ...btn(GUARD), textDecoration: "none" }}>RESET PASSWORD</a>
+        </div>
+        <div style={row}>
+          <div>
+            <div style={mono}>Two-factor authentication (TOTP)</div>
+            <div style={{ ...mono, fontSize: 11, color: MUTE, marginTop: 2 }}>
+              Add an authenticator app for sign-in — available on every account.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={card}>
+        <div style={label}>LINKED BANKS</div>
+        {banks.length === 0 && (
+          <div style={{ ...mono, fontSize: 12, color: MUTE, padding: "6px 0" }}>
+            No banks connected — the ledger shows sample data.
+          </div>
+        )}
+        {banks.map((b) => (
+          <div key={b.connectionId} style={row}>
+            <div style={mono}>
+              {b.institution}
+              <span style={{ fontSize: 11, color: MUTE }}> · linked {String(b.createdAt).slice(0, 10)}</span>
+            </div>
+            <button onClick={() => removeBank(b)} style={btn(LEAK)}>DISCONNECT</button>
+          </div>
+        ))}
+        <div style={{ marginTop: 10 }}>
+          <button onClick={connectBank} disabled={linking} style={btn(GUARD, true)}>
+            {linking ? "CONNECTING…" : "+ CONNECT BANK"}
+          </button>
+        </div>
+      </div>
+
+      <div style={card}>
+        <div style={label}>DATA &amp; PRIVACY</div>
+        <div style={row}>
+          <div style={mono}>Download everything SEVER holds about you</div>
+          <button onClick={handleExport} style={btn()}>EXPORT DATA</button>
+        </div>
+        <div style={row}>
+          <div>
+            <div style={mono}>Delete account</div>
+            <div style={{ ...mono, fontSize: 11, color: MUTE, marginTop: 2 }}>
+              Permanent. Erases your ledger, bank connections, and sign-in.
+            </div>
+          </div>
+          <button onClick={handleDeleteAccount} style={btn(LEAK)}>DELETE ACCOUNT</button>
+        </div>
+        <div style={{ ...mono, fontSize: 11, color: MUTE, marginTop: 12 }}>
+          <a href="./privacy.html" style={{ color: GUARD }}>Privacy policy</a>
+          {" · "}
+          <a href="./terms.html" style={{ color: GUARD }}>Terms of service</a>
+        </div>
+      </div>
+    </main>
   );
 }
